@@ -484,8 +484,19 @@ class Cylinder : public ParamSurface {
 public:
 	Cylinder() { create(); }
 	void eval(Dnum2& U, Dnum2& V, Dnum2& X, Dnum2& Y, Dnum2& Z) {
-		U = U * 2.0f * M_PI, V = V * 2 - 1.0f;
+		U = U * 2.0f * M_PI;
 		X = Cos(U); Y = Sin(U); Z = V;
+	}
+};
+
+//---------------------------
+class Paraboloid : public ParamSurface {
+	//---------------------------
+public:
+	Paraboloid() { create(); }
+	void eval(Dnum2& U, Dnum2& V, Dnum2& X, Dnum2& Y, Dnum2& Z) {
+		U = U * 2.0f * M_PI, V = V * 2;
+		X = Cos(U) * V; Z = Sin(U) * V; Y = Pow(V, 2);
 	}
 };
 
@@ -555,6 +566,7 @@ public:
 		// Geometries
 		Geometry* sphere = new Sphere();
 		Geometry* cylinder = new Cylinder();
+		Geometry* paraboloid = new Paraboloid();
 
 		// Create objects by setting up their vertex data on the GPU
 		Object* sphereObject1 = new Object(phongShader, material0, texture15x20, sphere);
@@ -567,6 +579,12 @@ public:
 		cylinderObject1->translation = vec3(3, 3, 2);
 		cylinderObject1->scale = vec3(0.5f, 0.5f, 0.5f);
 		objects.push_back(cylinderObject1);
+
+		// Create objects by setting up their vertex data on the GPU
+		Object* paraboloidObject = new Object(phongShader, material0, texture15x20, paraboloid);
+		paraboloidObject->translation = vec3(0, 0, 2);
+		paraboloidObject->scale = vec3(0.5f, 0.5f, 0.5f);
+		objects.push_back(paraboloidObject);
 
 
 		int nObjects = objects.size();
