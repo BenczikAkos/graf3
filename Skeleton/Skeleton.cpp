@@ -108,19 +108,6 @@ struct Light {
 	vec4 wLightPos; // homogeneous coordinates, can be at ideal point
 };
 
-//---------------------------
-class CheckerBoardTexture : public Texture {
-	//---------------------------
-public:
-	CheckerBoardTexture(const int width, const int height) : Texture() {
-		std::vector<vec4> image(width * height);
-		const vec4 yellow(1, 1, 0, 1), blue(0, 0, 1, 1);
-		for (int x = 0; x < width; x++) for (int y = 0; y < height; y++) {
-			image[y * width + x] = (x & 1) ^ (y & 1) ? yellow : blue;
-		}
-		create(width, height, image, GL_NEAREST);
-	}
-};
 
 //---------------------------
 struct RenderState {
@@ -132,104 +119,9 @@ struct RenderState {
 	vec3	           wEye;
 };
 
+
 //---------------------------
 class Shader : public GPUProgram {
-	//---------------------------
-public:
-	virtual void Bind(RenderState state) = 0;
-
-	void setUniformMaterial(const Material& material, const std::string& name) {
-		setUniform(material.kd, name + ".kd");
-		setUniform(material.ks, name + ".ks");
-		setUniform(material.ka, name + ".ka");
-		setUniform(material.shininess, name + ".shininess");
-	}
-
-	void setUniformLight(const Light& light, const std::string& name) {
-		setUniform(light.La, name + ".La");
-		setUniform(light.Le, name + ".Le");
-		setUniform(light.wLightPos, name + ".wLightPos");
-	}
-};
-
-//---------------------------
-class GouraudShader : public Shader {
-	//---------------------------
-	const char* vertexSource = R"(
-		#version 330
-		precision highp float;
-
-		struct Light {
-			vec3 La, Le;
-			vec4 wLightPos;
-		};
-		
-		struct Material {
-			vec3 kd, ks, ka;
-			float shininess;
-		};
-
-		uniform mat4  MVP, M, Minv;  // MVP, Model, Model-inverse
-		uniform Light[8] lights;     // light source direction 
-		uniform int   nLights;		 // number of light sources
-		uniform vec3  wEye;          // pos of eye
-		uniform Material  material;  // diffuse, specular, ambient ref
-
-		layout(location = 0) in vec3  vtxPos;            // pos in modeling space
-		layout(location = 1) in vec3  vtxNorm;      	 // normal in modeling space
-
-		out vec3 radiance;		    // reflected radiance
-
-		void main() {
-			gl_Position = vec4(vtxPos, 1) * MVP; // to NDC
-			// radiance computation
-			vec4 wPos = vec4(vtxPos, 1) * M;	
-			vec3 V = normalize(wEye * wPos.w - wPos.xyz);
-			vec3 N = normalize((Minv * vec4(vtxNorm, 0)).xyz);
-			if (dot(N, V) < 0) N = -N;	// prepare for one-sided surfaces like Mobius or Klein
-
-			radiance = vec3(0, 0, 0);
-			for(int i = 0; i < nLights; i++) {
-				vec3 L = normalize(lights[i].wLightPos.xyz * wPos.w - wPos.xyz * lights[i].wLightPos.w);
-				vec3 H = normalize(L + V);
-				float cost = max(dot(N,L), 0), cosd = max(dot(N,H), 0);
-				radiance += material.ka * lights[i].La + (material.kd * cost + material.ks * pow(cosd, material.shininess)) * lights[i].Le;
-			}
-		}
-	)";
-
-	// fragment shader in GLSL
-	const char* fragmentSource = R"(
-		#version 330
-		precision highp float;
-
-		in  vec3 radiance;      // interpolated radiance
-		out vec4 fragmentColor; // output goes to frame buffer
-
-		void main() {
-			fragmentColor = vec4(radiance, 1);
-		}
-	)";
-public:
-	GouraudShader() { create(vertexSource, fragmentSource, "fragmentColor"); }
-
-	void Bind(RenderState state) {
-		Use(); 		// make this program run
-		setUniform(state.MVP, "MVP");
-		setUniform(state.M, "M");
-		setUniform(state.Minv, "Minv");
-		setUniform(state.wEye, "wEye");
-		setUniformMaterial(*state.material, "material");
-
-		setUniform((int)state.lights.size(), "nLights");
-		for (unsigned int i = 0; i < state.lights.size(); i++) {
-			setUniformLight(state.lights[i], std::string("lights[") + std::to_string(i) + std::string("]"));
-		}
-	}
-};
-
-//---------------------------
-class PhongShader : public Shader {
 	//---------------------------
 	const char* vertexSource = R"(
 		#version 330
@@ -247,12 +139,10 @@ class PhongShader : public Shader {
 
 		layout(location = 0) in vec3  vtxPos;            // pos in modeling space
 		layout(location = 1) in vec3  vtxNorm;      	 // normal in modeling space
-		layout(location = 2) in vec2  vtxUV;
 
 		out vec3 wNormal;		    // normal in world space
 		out vec3 wView;             // view in world space
 		out vec3 wLight[8];		    // light dir in world space
-		out vec2 texcoord;
 
 		void main() {
 			gl_Position = vec4(vtxPos, 1) * MVP; // to NDC
@@ -263,7 +153,6 @@ class PhongShader : public Shader {
 			}
 		    wView  = wEye * wPos.w - wPos.xyz;
 		    wNormal = (Minv * vec4(vtxNorm, 0)).xyz;
-		    texcoord = vtxUV;
 		}
 	)";
 
@@ -285,12 +174,10 @@ class PhongShader : public Shader {
 		uniform Material material;
 		uniform Light[8] lights;    // light sources 
 		uniform int   nLights;
-		uniform sampler2D diffuseTexture;
 
 		in  vec3 wNormal;       // interpolated world sp normal
 		in  vec3 wView;         // interpolated world sp view
 		in  vec3 wLight[8];     // interpolated world sp illum dir
-		in  vec2 texcoord;
 		
         out vec4 fragmentColor; // output goes to frame buffer
 
@@ -298,9 +185,8 @@ class PhongShader : public Shader {
 			vec3 N = normalize(wNormal);
 			vec3 V = normalize(wView); 
 			if (dot(N, V) < 0) N = -N;	// prepare for one-sided surfaces like Mobius or Klein
-			vec3 texColor = texture(diffuseTexture, texcoord).rgb;
-			vec3 ka = material.ka * texColor;
-			vec3 kd = material.kd * texColor;
+			vec3 ka = material.ka;
+			vec3 kd = material.kd;
 
 			vec3 radiance = vec3(0, 0, 0);
 			for(int i = 0; i < nLights; i++) {
@@ -309,13 +195,13 @@ class PhongShader : public Shader {
 				float cost = max(dot(N,L), 0), cosd = max(dot(N,H), 0);
 				// kd and ka are modulated by the texture
 				radiance += ka * lights[i].La + 
-                           (kd * texColor * cost + material.ks * pow(cosd, material.shininess)) * lights[i].Le;
+                           (kd * cost + material.ks * pow(cosd, material.shininess)) * lights[i].Le;
 			}
 			fragmentColor = vec4(radiance, 1);
 		}
 	)";
 public:
-	PhongShader() { create(vertexSource, fragmentSource, "fragmentColor"); }
+	Shader() { create(vertexSource, fragmentSource, "fragmentColor"); }
 
 	void Bind(RenderState state) {
 		Use(); 		// make this program run
@@ -323,7 +209,6 @@ public:
 		setUniform(state.M, "M");
 		setUniform(state.Minv, "Minv");
 		setUniform(state.wEye, "wEye");
-		setUniform(*state.texture, std::string("diffuseTexture"));
 		setUniformMaterial(*state.material, "material");
 
 		setUniform((int)state.lights.size(), "nLights");
@@ -331,68 +216,21 @@ public:
 			setUniformLight(state.lights[i], std::string("lights[") + std::to_string(i) + std::string("]"));
 		}
 	}
-};
 
-//---------------------------
-class NPRShader : public Shader {
-	//---------------------------
-	const char* vertexSource = R"(
-		#version 330
-		precision highp float;
+	void setUniformMaterial(const Material& material, const std::string& name) {
+		setUniform(material.kd, name + ".kd");
+		setUniform(material.ks, name + ".ks");
+		setUniform(material.ka, name + ".ka");
+		setUniform(material.shininess, name + ".shininess");
+	}
 
-		uniform mat4  MVP, M, Minv; // MVP, Model, Model-inverse
-		uniform	vec4  wLightPos;
-		uniform vec3  wEye;         // pos of eye
-
-		layout(location = 0) in vec3  vtxPos;            // pos in modeling space
-		layout(location = 1) in vec3  vtxNorm;      	 // normal in modeling space
-		layout(location = 2) in vec2  vtxUV;
-
-		out vec3 wNormal, wView, wLight;				// in world space
-		out vec2 texcoord;
-
-		void main() {
-		   gl_Position = vec4(vtxPos, 1) * MVP; // to NDC
-		   vec4 wPos = vec4(vtxPos, 1) * M;
-		   wLight = wLightPos.xyz * wPos.w - wPos.xyz * wLightPos.w;
-		   wView  = wEye * wPos.w - wPos.xyz;
-		   wNormal = (Minv * vec4(vtxNorm, 0)).xyz;
-		   texcoord = vtxUV;
-		}
-	)";
-
-	// fragment shader in GLSL
-	const char* fragmentSource = R"(
-		#version 330
-		precision highp float;
-
-		uniform sampler2D diffuseTexture;
-
-		in  vec3 wNormal, wView, wLight;	// interpolated
-		in  vec2 texcoord;
-		out vec4 fragmentColor;    			// output goes to frame buffer
-
-		void main() {
-		   vec3 N = normalize(wNormal), V = normalize(wView), L = normalize(wLight);
-		   if (dot(N, V) < 0) N = -N;	// prepare for one-sided surfaces like Mobius or Klein
-		   float y = (dot(N, L) > 0.5) ? 1 : 0.5;
-		   if (abs(dot(N, V)) < 0.2) fragmentColor = vec4(0, 0, 0, 1);
-		   else						 fragmentColor = vec4(y * texture(diffuseTexture, texcoord).rgb, 1);
-		}
-	)";
-public:
-	NPRShader() { create(vertexSource, fragmentSource, "fragmentColor"); }
-
-	void Bind(RenderState state) {
-		Use(); 		// make this program run
-		setUniform(state.MVP, "MVP");
-		setUniform(state.M, "M");
-		setUniform(state.Minv, "Minv");
-		setUniform(state.wEye, "wEye");
-		setUniform(*state.texture, std::string("diffuseTexture"));
-		setUniform(state.lights[0].wLightPos, "wLightPos");
+	void setUniformLight(const Light& light, const std::string& name) {
+		setUniform(light.La, name + ".La");
+		setUniform(light.Le, name + ".Le");
+		setUniform(light.wLightPos, name + ".wLightPos");
 	}
 };
+
 
 //---------------------------
 class Geometry {
@@ -505,15 +343,13 @@ struct Object {
 	//---------------------------
 	Shader* shader;
 	Material* material;
-	Texture* texture;
 	Geometry* geometry;
 	vec3 scale, translation, rotationAxis;
 	float rotationAngle;
 public:
-	Object(Shader* _shader, Material* _material, Texture* _texture, Geometry* _geometry) :
+	Object(Shader* _shader, Material* _material, Geometry* _geometry) :
 		scale(vec3(1, 1, 1)), translation(vec3(0, 0, 0)), rotationAxis(0, 0, 1), rotationAngle(0) {
 		shader = _shader;
-		texture = _texture;
 		material = _material;
 		geometry = _geometry;
 	}
@@ -530,7 +366,6 @@ public:
 		state.Minv = Minv;
 		state.MVP = state.M * state.V * state.P;
 		state.material = material;
-		state.texture = texture;
 		shader->Bind(state);
 		geometry->Draw();
 	}
@@ -546,22 +381,15 @@ class Scene {
 	std::vector<Light> lights;
 public:
 	void Build() {
-		// Shaders
-		Shader* phongShader = new PhongShader();
-		Shader* gouraudShader = new GouraudShader();
-		Shader* nprShader = new NPRShader();
+		// Shader
+		Shader* shader = new Shader();
 
-		// Materials
-		Material* material0 = new Material;
-		material0->kd = vec3(0.6f, 0.4f, 0.2f);
-		material0->ks = vec3(4, 4, 4);
-		material0->ka = vec3(0.1f, 0.1f, 0.1f);
-		material0->shininess = 100;
-
-
-		// Textures
-		Texture* texture4x8 = new CheckerBoardTexture(4, 8);
-		Texture* texture15x20 = new CheckerBoardTexture(15, 20);
+		// Material
+		Material* matter = new Material;
+		matter->kd = vec3(0.6f, 0.4f, 0.2f);
+		matter->ks = vec3(4, 4, 4);
+		matter->ka = vec3(0.1f, 0.1f, 0.1f);
+		matter->shininess = 100;
 
 		// Geometries
 		Geometry* sphere = new Sphere();
@@ -569,35 +397,23 @@ public:
 		Geometry* paraboloid = new Paraboloid();
 
 		// Create objects by setting up their vertex data on the GPU
-		Object* sphereObject1 = new Object(phongShader, material0, texture15x20, sphere);
+		Object* sphereObject1 = new Object(shader, matter, sphere);
 		sphereObject1->translation = vec3(-3, 3, 0);
 		sphereObject1->scale = vec3(0.5f, 0.5f, 0.5f);
 		objects.push_back(sphereObject1);
 
 		// Create objects by setting up their vertex data on the GPU
-		Object* cylinderObject1 = new Object(phongShader, material0, texture15x20, cylinder);
+		Object* cylinderObject1 = new Object(shader, matter, cylinder);
 		cylinderObject1->translation = vec3(3, 3, 2);
 		cylinderObject1->scale = vec3(0.5f, 0.5f, 0.5f);
 		objects.push_back(cylinderObject1);
 
 		// Create objects by setting up their vertex data on the GPU
-		Object* paraboloidObject = new Object(phongShader, material0, texture15x20, paraboloid);
+		Object* paraboloidObject = new Object(shader, matter, paraboloid);
 		paraboloidObject->translation = vec3(0, 0, 2);
 		paraboloidObject->scale = vec3(0.5f, 0.5f, 0.5f);
 		objects.push_back(paraboloidObject);
 
-
-		int nObjects = objects.size();
-		for (int i = 0; i < nObjects; i++) {
-			Object* object = new Object(*objects[i]);
-			object->translation.y -= 3;
-			object->shader = gouraudShader;
-			objects.push_back(object);
-			object = new Object(*objects[i]);
-			object->translation.y -= 6;
-			object->shader = nprShader;
-			objects.push_back(object);
-		}
 
 		// Camera
 		camera.wEye = vec3(0, 0, 8);
