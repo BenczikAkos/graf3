@@ -92,6 +92,12 @@ public:
 			0, 0, -(fp + bp) / (bp - fp), -1,
 			0, 0, -2 * fp * bp / (bp - fp), 0);
 	}
+
+	void Animate(float dt) {
+		vec4 wEye4 = vec4(wEye.x, wEye.y, wEye.z, 1);
+		wEye4 = wEye4 * RotationMatrix(dt, vec3(0, 1, 0));
+		wEye = vec3(wEye4.x, wEye4.y, wEye4.z);
+	}
 };
 
 //---------------------------
@@ -116,7 +122,7 @@ struct RenderState {
 	Material* material;
 	std::vector<Light> lights;
 	Texture* texture;
-	vec3	           wEye;
+	vec3 wEye;
 };
 
 
@@ -187,15 +193,17 @@ class Shader : public GPUProgram {
 			if (dot(N, V) < 0) N = -N;	// prepare for one-sided surfaces like Mobius or Klein
 			vec3 ka = material.ka;
 			vec3 kd = material.kd;
+			vec3 weight = vec3(1,1,1);
 
 			vec3 radiance = vec3(0, 0, 0);
 			for(int i = 0; i < nLights; i++) {
 				vec3 L = normalize(wLight[i]);
 				vec3 H = normalize(L + V);
+				weight *= distance(wView, lights[i].wLightPos.xyz);
 				float cost = max(dot(N,L), 0), cosd = max(dot(N,H), 0);
 				// kd and ka are modulated by the texture
 				radiance += ka * lights[i].La + 
-                           (kd * cost + material.ks * pow(cosd, material.shininess)) * lights[i].Le;
+                           ((kd * cost + material.ks * pow(cosd, material.shininess)) * lights[i].Le) * weight;
 			}
 			fragmentColor = vec4(radiance, 1);
 		}
@@ -403,8 +411,14 @@ public:
 		objects.push_back(sphereObject1);
 
 		// Create objects by setting up their vertex data on the GPU
+		Object* sphereObject2 = new Object(shader, matter, sphere);
+		sphereObject2->translation = vec3(-3, -5, 0);
+		sphereObject2->scale = vec3(0.5f, 0.5f, 0.5f);
+		objects.push_back(sphereObject2);
+
+		// Create objects by setting up their vertex data on the GPU
 		Object* cylinderObject1 = new Object(shader, matter, cylinder);
-		cylinderObject1->translation = vec3(3, 3, 2);
+		cylinderObject1->translation = vec3(3, 3, 0);
 		cylinderObject1->scale = vec3(0.5f, 0.5f, 0.5f);
 		objects.push_back(cylinderObject1);
 
@@ -422,17 +436,17 @@ public:
 
 		// Lights
 		lights.resize(3);
-		lights[0].wLightPos = vec4(5, 5, 4, 0);	// ideal point -> directional light source
+		lights[0].wLightPos = vec4(2, 2, 3, 1);	// ideal point -> directional light source
 		lights[0].La = vec3(0.1f, 0.1f, 1);
-		lights[0].Le = vec3(3, 0, 0);
+		lights[0].Le = vec3(1, 0, 0);
 
-		lights[1].wLightPos = vec4(5, 10, 20, 0);	// ideal point -> directional light source
-		lights[1].La = vec3(0.2f, 0.2f, 0.2f);
-		lights[1].Le = vec3(0, 3, 0);
+		lights[1].wLightPos = vec4(1, 2, 4, 1);	// ideal point -> directional light source
+		lights[1].La = vec3(0, 0, 0);
+		lights[1].Le = vec3(0, 0, 0);
 
-		lights[2].wLightPos = vec4(-5, 5, 5, 0);	// ideal point -> directional light source
-		lights[2].La = vec3(0.1f, 0.1f, 0.1f);
-		lights[2].Le = vec3(0, 0, 3);
+		lights[2].wLightPos = vec4(-5, 5, 5, 1);	// ideal point -> directional light source
+		lights[2].La = vec3(0, 0, 0);
+		lights[2].Le = vec3(0, 0, 0);
 	}
 
 	void Render() {
@@ -445,7 +459,8 @@ public:
 	}
 
 	void Animate(float tstart, float tend) {
-		for (Object* obj : objects) obj->Animate(tstart, tend);
+		//for (Object* obj : objects) obj->Animate(tstart, tend);
+		camera.Animate(tstart - tend);
 	}
 };
 
