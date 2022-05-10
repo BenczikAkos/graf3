@@ -429,22 +429,35 @@ public:
 		objects.push_back(floor);
 
 		// Create objects by setting up their vertex data on the GPU
-		Object* cylinderObject1 = new Object(shader, matter, cylinder);
-		cylinderObject1->translation = vec3(3, 3, 0);
-		cylinderObject1->scale = vec3(0.5f, 0.5f, 0.5f);
-		objects.push_back(cylinderObject1);
+		Object* talp = new Object(shader, matter, cylinder);
+		talp->translation = vec3(0, -3, 0);
+		talp->scale = vec3(2, 0.5, 2);
+		objects.push_back(talp);
 
 		// Create objects by setting up their vertex data on the GPU
-		Object* sphereObject1 = new Object(shader, matter, sphere);
-		sphereObject1->translation = vec3(-2, 0, 0);
-		sphereObject1->scale = vec3(0.5f, 0.5f, 0.5f);
-		objects.push_back(sphereObject1);
+		Object* fedo = new Object(shader, matter, circle);
+		fedo->translation = vec3(0, -2.5, 0);
+		fedo->scale = vec3(2, 0.5, 2);
+		objects.push_back(fedo);
+
+		// Create objects by setting up their vertex data on the GPU
+		Object* csuklo1 = new Object(shader, matter, sphere);
+		csuklo1->translation = vec3(0, -2.5, 0);
+		csuklo1->scale = vec3(0.5f, 0.5f, 0.5f);
+		objects.push_back(csuklo1);
+
+		// Create objects by setting up their vertex data on the GPU
+		Object* rud1 = new Object(shader, matter, cylinder);
+		rud1->translation = vec3(0, -2.5, 0);
+		rud1->scale = vec3(0.2, 3, 0.2);
+		objects.push_back(rud1);
 
 		// Create objects by setting up their vertex data on the GPU
 		Object* sphereObject2 = new Object(shader, matter, sphere);
 		sphereObject2->translation = vec3(-3, -5, 0);
 		sphereObject2->scale = vec3(0.5f, 0.5f, 0.5f);
 		objects.push_back(sphereObject2);
+
 		// Create objects by setting up their vertex data on the GPU
 		Object* paraboloidObject = new Object(shader, matter, paraboloid);
 		paraboloidObject->translation = vec3(0, 3, 2);
@@ -460,7 +473,7 @@ public:
 
 		// Lights
 		lights.resize(3);
-		lights[0].wLightPos = vec4(0, -2, 0, 1);	// ideal point -> directional light source
+		lights[0].wLightPos = vec4(0, 2, 0, 1);	// ideal point -> directional light source
 		lights[0].La = vec3(0.1f, 0.1f, 1);
 		lights[0].Le = vec3(1, 0, 0);
 
