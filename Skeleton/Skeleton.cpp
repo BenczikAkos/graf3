@@ -261,7 +261,6 @@ public:
 //---------------------------
 class ParamSurface : public Geometry {
 	//---------------------------
-protected:
 	struct VertexData {
 		vec3 position, normal;
 		vec2 texcoord;
@@ -306,7 +305,7 @@ public:
 		glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, sizeof(VertexData), (void*)offsetof(VertexData, texcoord));
 	}
 
-	virtual void Draw() {
+	void Draw() {
 		glBindVertexArray(vao);
 		for (unsigned int i = 0; i < nStrips; i++) glDrawArrays(GL_TRIANGLE_STRIP, i * nVtxPerStrip, nVtxPerStrip);
 	}
@@ -353,12 +352,9 @@ public:
 	Circle() { create(); }
 	void eval(Dnum2& U, Dnum2& V, Dnum2& X, Dnum2& Y, Dnum2& Z) {
 		U = U * 2.0f * M_PI;
-		X = Cos(U); Z = Sin(U); Y = 0;
+		X = Cos(U) * V; Z = Sin(U) * V; Y = 0;
 	}
-	void Draw() {
-		glBindVertexArray(vao);
-		for (unsigned int i = 0; i < nStrips; i++) glDrawArrays(GL_TRIANGLE_FAN, i * nVtxPerStrip, nVtxPerStrip);
-	}
+
 };
 
 //---------------------------
@@ -447,7 +443,9 @@ public:
 		// Create objects by setting up their vertex data on the GPU
 		Object* floor = new Object(shader, matter, circle);
 		floor->translation = vec3(0, -3, 0);
-		floor->scale = vec3(10,10,10);
+		floor->rotationAngle = 15;
+		floor->rotationAxis = vec3(0, 0, 1);
+		floor->scale = vec3(1,1,1);
 		objects.push_back(floor);
 
 
