@@ -199,11 +199,10 @@ class Shader : public GPUProgram {
 			for(int i = 0; i < nLights; i++) {
 				vec3 L = normalize(wLight[i]);
 				vec3 H = normalize(L + V);
-				weight *= distance(wView, lights[i].wLightPos.xyz);
+				weight /= pow(distance(wView, lights[i].wLightPos.xyz), 2);
 				float cost = max(dot(N,L), 0), cosd = max(dot(N,H), 0);
-				// kd and ka are modulated by the texture
 				radiance += ka * lights[i].La + 
-                           ((kd * cost + material.ks * pow(cosd, material.shininess)) * lights[i].Le) * weight;
+                           ((kd * cost + material.ks * pow(cosd, material.shininess)) * lights[i].Le);
 			}
 			fragmentColor = vec4(radiance, 1);
 		}
@@ -262,6 +261,7 @@ public:
 //---------------------------
 class ParamSurface : public Geometry {
 	//---------------------------
+protected:
 	struct VertexData {
 		vec3 position, normal;
 		vec2 texcoord;
@@ -306,7 +306,7 @@ public:
 		glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, sizeof(VertexData), (void*)offsetof(VertexData, texcoord));
 	}
 
-	void Draw() {
+	virtual void Draw() {
 		glBindVertexArray(vao);
 		for (unsigned int i = 0; i < nStrips; i++) glDrawArrays(GL_TRIANGLE_STRIP, i * nVtxPerStrip, nVtxPerStrip);
 	}
@@ -343,6 +343,21 @@ public:
 	void eval(Dnum2& U, Dnum2& V, Dnum2& X, Dnum2& Y, Dnum2& Z) {
 		U = U * 2.0f * M_PI, V = V * 2;
 		X = Cos(U) * V; Z = Sin(U) * V; Y = Pow(V, 2);
+	}
+};
+
+//---------------------------
+class Circle : public ParamSurface {
+	//---------------------------
+public:
+	Circle() { create(); }
+	void eval(Dnum2& U, Dnum2& V, Dnum2& X, Dnum2& Y, Dnum2& Z) {
+		U = U * 2.0f * M_PI;
+		X = Cos(U); Z = Sin(U); Y = 0;
+	}
+	void Draw() {
+		glBindVertexArray(vao);
+		for (unsigned int i = 0; i < nStrips; i++) glDrawArrays(GL_TRIANGLE_FAN, i * nVtxPerStrip, nVtxPerStrip);
 	}
 };
 
@@ -403,10 +418,11 @@ public:
 		Geometry* sphere = new Sphere();
 		Geometry* cylinder = new Cylinder();
 		Geometry* paraboloid = new Paraboloid();
+		Geometry* circle = new Circle();
 
 		// Create objects by setting up their vertex data on the GPU
 		Object* sphereObject1 = new Object(shader, matter, sphere);
-		sphereObject1->translation = vec3(-3, 3, 0);
+		sphereObject1->translation = vec3(-2, 0, 0);
 		sphereObject1->scale = vec3(0.5f, 0.5f, 0.5f);
 		objects.push_back(sphereObject1);
 
@@ -424,9 +440,15 @@ public:
 
 		// Create objects by setting up their vertex data on the GPU
 		Object* paraboloidObject = new Object(shader, matter, paraboloid);
-		paraboloidObject->translation = vec3(0, 0, 2);
+		paraboloidObject->translation = vec3(0, 3, 2);
 		paraboloidObject->scale = vec3(0.5f, 0.5f, 0.5f);
 		objects.push_back(paraboloidObject);
+
+		// Create objects by setting up their vertex data on the GPU
+		Object* floor = new Object(shader, matter, circle);
+		floor->translation = vec3(0, -3, 0);
+		floor->scale = vec3(10,10,10);
+		objects.push_back(floor);
 
 
 		// Camera
@@ -436,7 +458,7 @@ public:
 
 		// Lights
 		lights.resize(3);
-		lights[0].wLightPos = vec4(2, 2, 3, 1);	// ideal point -> directional light source
+		lights[0].wLightPos = vec4(0, -2, 0, 1);	// ideal point -> directional light source
 		lights[0].La = vec3(0.1f, 0.1f, 1);
 		lights[0].Le = vec3(1, 0, 0);
 
