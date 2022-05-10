@@ -65,6 +65,7 @@ typedef Dnum<vec2> Dnum2;
 
 const int tessellationLevel = 20;
 
+
 //---------------------------
 struct Camera { // 3D camera
 //---------------------------
@@ -330,7 +331,7 @@ public:
 	Cylinder() { create(); }
 	void eval(Dnum2& U, Dnum2& V, Dnum2& X, Dnum2& Y, Dnum2& Z) {
 		U = U * 2.0f * M_PI;
-		X = Cos(U); Y = Sin(U); Z = V;
+		X = Cos(U); Z = Sin(U); Y = V;
 	}
 };
 
@@ -365,6 +366,7 @@ struct Object {
 	Geometry* geometry;
 	vec3 scale, translation, rotationAxis;
 	float rotationAngle;
+	Object* child = nullptr;
 public:
 	Object(Shader* _shader, Material* _material, Geometry* _geometry) :
 		scale(vec3(1, 1, 1)), translation(vec3(0, 0, 0)), rotationAxis(0, 0, 1), rotationAngle(0) {
@@ -373,20 +375,24 @@ public:
 		geometry = _geometry;
 	}
 
-	virtual void SetModelingTransform(mat4& M, mat4& Minv) {
-		M = ScaleMatrix(scale) * RotationMatrix(rotationAngle, rotationAxis) * TranslateMatrix(translation);
-		Minv = TranslateMatrix(-translation) * RotationMatrix(-rotationAngle, rotationAxis) * ScaleMatrix(vec3(1 / scale.x, 1 / scale.y, 1 / scale.z));
+	void setChild(Object* object) {
+		child = object;
 	}
 
 	void Draw(RenderState state) {
-		mat4 M, Minv;
-		SetModelingTransform(M, Minv);
-		state.M = M;
-		state.Minv = Minv;
+		state.M = ScaleMatrix(scale) *
+			RotationMatrix(rotationAngle, rotationAxis) *
+			TranslateMatrix(translation) * state.M;
+		state.Minv = state.Minv *
+			TranslateMatrix(-translation) *
+			RotationMatrix(-rotationAngle, rotationAxis) *
+			ScaleMatrix(vec3(1/scale.x, 1/scale.y, 1/scale.z));
 		state.MVP = state.M * state.V * state.P;
 		state.material = material;
 		shader->Bind(state);
 		geometry->Draw();
+		if (child != nullptr)
+			child->Draw(state);
 	}
 
 	virtual void Animate(float tstart, float tend) { rotationAngle = 0.8f * tend; }
@@ -417,6 +423,18 @@ public:
 		Geometry* circle = new Circle();
 
 		// Create objects by setting up their vertex data on the GPU
+		Object* floor = new Object(shader, matter, circle);
+		floor->translation = vec3(0, -3, 0);
+		floor->scale = vec3(50,50,50);
+		objects.push_back(floor);
+
+		// Create objects by setting up their vertex data on the GPU
+		Object* cylinderObject1 = new Object(shader, matter, cylinder);
+		cylinderObject1->translation = vec3(3, 3, 0);
+		cylinderObject1->scale = vec3(0.5f, 0.5f, 0.5f);
+		objects.push_back(cylinderObject1);
+
+		// Create objects by setting up their vertex data on the GPU
 		Object* sphereObject1 = new Object(shader, matter, sphere);
 		sphereObject1->translation = vec3(-2, 0, 0);
 		sphereObject1->scale = vec3(0.5f, 0.5f, 0.5f);
@@ -427,26 +445,12 @@ public:
 		sphereObject2->translation = vec3(-3, -5, 0);
 		sphereObject2->scale = vec3(0.5f, 0.5f, 0.5f);
 		objects.push_back(sphereObject2);
-
-		// Create objects by setting up their vertex data on the GPU
-		Object* cylinderObject1 = new Object(shader, matter, cylinder);
-		cylinderObject1->translation = vec3(3, 3, 0);
-		cylinderObject1->scale = vec3(0.5f, 0.5f, 0.5f);
-		objects.push_back(cylinderObject1);
-
 		// Create objects by setting up their vertex data on the GPU
 		Object* paraboloidObject = new Object(shader, matter, paraboloid);
 		paraboloidObject->translation = vec3(0, 3, 2);
 		paraboloidObject->scale = vec3(0.5f, 0.5f, 0.5f);
 		objects.push_back(paraboloidObject);
 
-		// Create objects by setting up their vertex data on the GPU
-		Object* floor = new Object(shader, matter, circle);
-		floor->translation = vec3(0, -3, 0);
-		floor->rotationAngle = 15;
-		floor->rotationAxis = vec3(0, 0, 1);
-		floor->scale = vec3(1,1,1);
-		objects.push_back(floor);
 
 
 		// Camera
@@ -471,6 +475,7 @@ public:
 
 	void Render() {
 		RenderState state;
+		state.M = state.Minv = mat4(vec4(1, 0, 0, 0), vec4(0, 1, 0, 0), vec4(0, 0, 1, 0), vec4(0, 0, 0, 1));
 		state.wEye = camera.wEye;
 		state.V = camera.V();
 		state.P = camera.P();
