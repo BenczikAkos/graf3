@@ -194,13 +194,11 @@ class Shader : public GPUProgram {
 			if (dot(N, V) < 0) N = -N;	// prepare for one-sided surfaces like Mobius or Klein
 			vec3 ka = material.ka;
 			vec3 kd = material.kd;
-			vec3 weight = vec3(1,1,1);
-
-			vec3 radiance = vec3(0, 0, 0);
+			
+			vec3 radiance = vec3(0,0,0);
 			for(int i = 0; i < nLights; i++) {
 				vec3 L = normalize(wLight[i]);
 				vec3 H = normalize(L + V);
-				weight /= pow(distance(wView, lights[i].wLightPos.xyz), 2);
 				float cost = max(dot(N,L), 0), cosd = max(dot(N,H), 0);
 				radiance += ka * lights[i].La + 
                            ((kd * cost + material.ks * pow(cosd, material.shininess)) * lights[i].Le);
@@ -367,22 +365,33 @@ struct Object {
 	vec3 scale, translation, rotationAxis;
 	float rotationAngle;
 	Object* child = nullptr;
+	vec3 refPoint;
 public:
-	Object(Shader* _shader, Material* _material, Geometry* _geometry) :
-		scale(vec3(1, 1, 1)), translation(vec3(0, 0, 0)), rotationAxis(0, 1, 0), rotationAngle(7.7) {
+	Object(Shader* _shader, Material* _material, Geometry* _geometry, vec3 translate) :
+		scale(vec3(1, 1, 1)), translation(translate), rotationAxis(0, 1, 0), rotationAngle(7.7) {
 		shader = _shader;
 		material = _material;
 		geometry = _geometry;
+		refPoint = translate;
 	}
 
 	void setChild(Object* object) {
 		child = object;
+		child->refPoint = child->refPoint + refPoint;
+	}
+
+	const vec3 getLastRefPoint() {
+		if (child == nullptr)
+			return refPoint;
+		return child->getLastRefPoint();
 	}
 
 	void Draw(RenderState state) {
 		state.M = ScaleMatrix(scale) *
 			RotationMatrix(rotationAngle, rotationAxis) *
 			TranslateMatrix(translation) * state.M;
+		vec4 refPointv4 = vec4(refPoint.x, refPoint.y, refPoint.z, 0) * state.M;
+		refPoint = vec3(refPointv4.x, refPointv4.y, refPointv4.z);
 		state.Minv = state.Minv *
 			TranslateMatrix(-translation) *
 			RotationMatrix(-rotationAngle, rotationAxis) *
@@ -420,7 +429,7 @@ public:
 
 		// Material
 		Material* matter = new Material;
-		matter->kd = vec3(0.6f, 0.6f, 0.6f);
+		matter->kd = vec3(0.8f, 0.8f, 0.8f);
 		matter->ks = vec3(4, 4, 4);
 		matter->ka = vec3(0.1f, 0.1f, 0.1f);
 		matter->shininess = 300;
@@ -438,52 +447,43 @@ public:
 		Geometry* circle = new Circle();
 
 		//Objects:
-		Object* floor = new Object(shader, floormatter, circle);
-		floor->translation = vec3(0, -3, 0);
+		Object* floor = new Object(shader, floormatter, circle, vec3(0, -3, 0));
 		floor->scale = vec3(50,50,50);
 		objects.push_back(floor);
 
-		Object* talp = new Object(shader, matter, cylinder);
-		talp->translation = vec3(0, -3, 0);
+		Object* talp = new Object(shader, matter, cylinder, vec3(0, -3, 0));
 		talp->scale = vec3(2, 0.5, 2);
 		objects.push_back(talp);
 
-		Object* fedo = new Object(shader, matter, circle);
-		fedo->translation = vec3(0, -2.5, 0);
+		Object* fedo = new Object(shader, matter, circle, vec3(0, -2.5, 0));
 		fedo->scale = vec3(2, 0.5, 2);
 		objects.push_back(fedo);
 
-		Object* csuklo1 = new Object(shader, matter, sphere);
-		csuklo1->translation = vec3(0, -2.5, 0);
+		Object* csuklo1 = new Object(shader, matter, sphere, vec3(0, -2.5, 0));
 		csuklo1->scale = vec3(0.3f, 0.3f, 0.3f);
 		objects.push_back(csuklo1);
 
-		Object* rud1 = new Object(shader, matter, cylinder);
+		Object* rud1 = new Object(shader, matter, cylinder, vec3(0, -2.5, 0));
 		rud1->rotationAxis = vec3(0, 2, 1);
-		rud1->translation = vec3(0, -2.5, 0);
 		rud1->scale = vec3(0.2, 3, 0.2);
 		objects.push_back(rud1);
 
-		Object* csuklo2 = new Object(shader, matter, sphere);
+		Object* csuklo2 = new Object(shader, matter, sphere, vec3(0, 3, 0));
 		csuklo2->rotationAxis = vec3(3, 10, 5);
-		csuklo2->translation = vec3(0, 3, 0);
 		csuklo2->scale = vec3(0.3f, 0.3f, 0.3f);
 		rud1->setChild(csuklo2);
 
-		Object* rud2 = new Object(shader, matter, cylinder);
-		rud2->translation = vec3(0, 0, 0);
+		Object* rud2 = new Object(shader, matter, cylinder, vec3(0, 0, 0));
 		rud2->scale = vec3(0.2, 3, 0.2);
 		csuklo2->setChild(rud2);
 
-		Object* csuklo3 = new Object(shader, matter, sphere);
-		csuklo3->translation = vec3(0, 3, 0);
+		Object* csuklo3 = new Object(shader, matter, sphere, vec3(0, 3, 0));
 		csuklo3->scale = vec3(0.3f, 0.3f, 0.3f);
 		rud2->setChild(csuklo3);
 
 
-		Object* bura = new Object(shader, matter, paraboloid);
+		Object* bura = new Object(shader, matter, paraboloid, vec3(0, 0, 0));
 		bura->rotationAxis = vec3(5, -3, 0);
-		bura->translation = vec3(0, 0, 0);
 		bura->scale = vec3(1, 0.5f, 1);
 		csuklo3->setChild(bura);
 
@@ -495,11 +495,13 @@ public:
 		// Lights
 		lights.resize(2);
 		lights[0].wLightPos = vec4(0, 0, 5, 1);
-		lights[0].La = vec3(0.1f, 0.1f, 1);
-		lights[0].Le = vec3(1, 0.8, 0.6);
+		lights[0].La = vec3(0, 0, 0);
+		lights[0].Le = vec3(0, 0, 0);
 
-		lights[1].wLightPos = vec4(6, 5, 4, 1);
-		lights[1].La = vec3(1, 0.1, 0.3);
+
+		vec3 fp = bura->refPoint;
+		lights[1].wLightPos = vec4(fp.x, fp.y, fp.z, 1);
+		lights[1].La = vec3(1, 1, 1);
 		lights[1].Le = vec3(0.3, 0.5, 0.5);
 
 	}
@@ -511,13 +513,21 @@ public:
 		state.V = camera.V();
 		state.P = camera.P();
 		state.lights = lights;
+
+		Object* rud1 = objects.back();
+		const vec3 startPos = rud1->getLastRefPoint();
+
 		for (Object* obj : objects) obj->Draw(state);
+
+		const vec3 finalPos = rud1->getLastRefPoint();
+		vec3 diff = finalPos - startPos;
+		lights[1].wLightPos = vec4(diff.x, diff.y, diff.z, 0);
+		rud1->shader->setUniform(lights[1].wLightPos, "lights[1].wLightPos");
 	}
 
 	void Animate(float tstart, float tend) {
 		Object* rud1 = objects.back();
 		rud1->Animate(tstart, tend);
-		camera.Animate(tstart - tend);
 	}
 };
 
