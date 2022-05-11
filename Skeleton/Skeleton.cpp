@@ -369,7 +369,7 @@ struct Object {
 	Object* child = nullptr;
 public:
 	Object(Shader* _shader, Material* _material, Geometry* _geometry) :
-		scale(vec3(1, 1, 1)), translation(vec3(0, 0, 0)), rotationAxis(0, 0, 1), rotationAngle(0) {
+		scale(vec3(1, 1, 1)), translation(vec3(0, 0, 0)), rotationAxis(0, 4, 1), rotationAngle(0) {
 		shader = _shader;
 		material = _material;
 		geometry = _geometry;
@@ -391,6 +391,8 @@ public:
 		state.material = material;
 		shader->Bind(state);
 		geometry->Draw();
+		state.M = ScaleMatrix(vec3(1 / scale.x, 1 / scale.y, 1 / scale.z)) * state.M;
+		state.Minv = state.Minv * ScaleMatrix(scale);
 		if (child != nullptr)
 			child->Draw(state);
 	}
@@ -455,25 +457,27 @@ public:
 		objects.push_back(rud1);
 
 		Object* csuklo2 = new Object(shader, matter, sphere);
-		csuklo2->translation = vec3(0, 0.5, 0);
+		csuklo2->translation = vec3(0, 3, 0);
 		csuklo2->scale = vec3(0.3f, 0.3f, 0.3f);
-		objects.push_back(csuklo2);
+		rud1->setChild(csuklo2);
 
 		Object* rud2 = new Object(shader, matter, cylinder);
-		rud2->translation = vec3(0, 0.5, 0);
+		rud2->rotationAxis = vec3(5, 10, 0);
+		rud2->translation = vec3(0, 0, 0);
 		rud2->scale = vec3(0.2, 3, 0.2);
-		objects.push_back(rud2);
+		csuklo2->setChild(rud2);
 
 		Object* csuklo3 = new Object(shader, matter, sphere);
-		csuklo3->translation = vec3(0, 3.5, 0);
+		csuklo3->translation = vec3(0, 3, 0);
 		csuklo3->scale = vec3(0.3f, 0.3f, 0.3f);
-		objects.push_back(csuklo3);
+		rud2->setChild(csuklo3);
 
 
-		Object* paraboloidObject = new Object(shader, matter, paraboloid);
-		paraboloidObject->translation = vec3(0, 3.5, 0);
-		paraboloidObject->scale = vec3(1, 0.5f, 1);
-		objects.push_back(paraboloidObject);
+		Object* bura = new Object(shader, matter, paraboloid);
+		bura->rotationAxis = vec3(1, -3, 5);
+		bura->translation = vec3(0, 0, 0);
+		bura->scale = vec3(1, 0.5f, 1);
+		csuklo3->setChild(bura);
 
 		// Camera
 		camera.wEye = vec3(0, 0, 10);
@@ -482,15 +486,15 @@ public:
 
 		// Lights
 		lights.resize(3);
-		lights[0].wLightPos = vec4(0, 0, 5, 1);	// ideal point -> directional light source
+		lights[0].wLightPos = vec4(0, 0, 5, 1);
 		lights[0].La = vec3(0.1f, 0.1f, 1);
 		lights[0].Le = vec3(1, 0.8, 0.6);
 
-		lights[1].wLightPos = vec4(6, 5, 4, 1);	// ideal point -> directional light source
+		lights[1].wLightPos = vec4(6, 5, 4, 1);
 		lights[1].La = vec3(1, 0.1, 0.3);
 		lights[1].Le = vec3(0.3, 0.5, 0.5);
 
-		lights[2].wLightPos = vec4(0, 5, -5, 1);	// ideal point -> directional light source
+		lights[2].wLightPos = vec4(0, 5, -5, 1);
 		lights[2].La = vec3(0.2, 0.1, 0.4);
 		lights[2].Le = vec3(0.45, 0.4, 0.5);
 	}
@@ -506,8 +510,9 @@ public:
 	}
 
 	void Animate(float tstart, float tend) {
-		//for (Object* obj : objects) obj->Animate(tstart, tend);
-		camera.Animate(tstart - tend);
+		Object* rud1 = objects.back();
+		rud1->Animate(tstart, tend);
+		//camera.Animate(tstart - tend);
 	}
 };
 
