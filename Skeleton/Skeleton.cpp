@@ -390,7 +390,7 @@ public:
 		state.M = ScaleMatrix(scale) *
 			RotationMatrix(rotationAngle, rotationAxis) *
 			TranslateMatrix(translation) * state.M;
-		vec4 refPointv4 = vec4(refPoint.x, refPoint.y, refPoint.z, 0) * state.M;
+		vec4 refPointv4 = vec4(refPoint.x, refPoint.y, refPoint.z, 1) * state.M;
 		refPoint = vec3(refPointv4.x, refPointv4.y, refPointv4.z);
 		state.Minv = state.Minv *
 			TranslateMatrix(-translation) *
@@ -520,8 +520,9 @@ public:
 		for (Object* obj : objects) obj->Draw(state);
 
 		const vec3 finalPos = rud1->getLastRefPoint();
+		vec4 finalPosv4 = vec4(finalPos.x, finalPos.y, finalPos.z, 1);
 		vec3 diff = finalPos - startPos;
-		lights[1].wLightPos = vec4(diff.x, diff.y, diff.z, 0);
+		lights[1].wLightPos = finalPosv4;
 		rud1->shader->setUniform(lights[1].wLightPos, "lights[1].wLightPos");
 	}
 
