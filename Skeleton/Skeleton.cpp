@@ -390,7 +390,7 @@ public:
 		state.M = ScaleMatrix(scale) *
 			RotationMatrix(rotationAngle, rotationAxis) *
 			TranslateMatrix(translation) * state.M;
-		vec4 refPointv4 = vec4(refPoint.x, refPoint.y, refPoint.z, 1) * state.M;
+		vec4 refPointv4 = vec4(0, 0, 0, 1) * state.M;
 		refPoint = vec3(refPointv4.x, refPointv4.y, refPointv4.z);
 		state.Minv = state.Minv *
 			TranslateMatrix(-translation) *
@@ -495,8 +495,8 @@ public:
 		// Lights
 		lights.resize(2);
 		lights[0].wLightPos = vec4(0, 0, 5, 1);
-		lights[0].La = vec3(0, 0, 0);
-		lights[0].Le = vec3(0, 0, 0);
+		lights[0].La = vec3(3, 3, 3);
+		lights[0].Le = vec3(0.4, 0.4, 0.4);
 
 
 		vec3 fp = bura->refPoint;
@@ -529,6 +529,7 @@ public:
 	void Animate(float tstart, float tend) {
 		Object* rud1 = objects.back();
 		rud1->Animate(tstart, tend);
+		camera.Animate(tstart - tend);
 	}
 };
 
