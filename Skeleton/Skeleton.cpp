@@ -113,6 +113,8 @@ struct Light {
 	//---------------------------
 	vec3 La, Le;
 	vec4 wLightPos; // homogeneous coordinates, can be at ideal point
+	vec3 dir; //merre vilagit
+	float fov; //skalaris szorzat minel legyen kisebb, hogy beleessen a megvilagitasaba
 };
 
 
@@ -137,6 +139,8 @@ class Shader : public GPUProgram {
 		struct Light {
 			vec3 La, Le;
 			vec4 wLightPos;
+			vec3 dir;
+			float fov;
 		};
 
 		uniform mat4  MVP, M, Minv; // MVP, Model, Model-inverse
@@ -171,6 +175,8 @@ class Shader : public GPUProgram {
 		struct Light {
 			vec3 La, Le;
 			vec4 wLightPos;
+			vec3 dir;
+			float fov;
 		};
 
 		struct Material {
@@ -196,12 +202,14 @@ class Shader : public GPUProgram {
 			vec3 kd = material.kd;
 			
 			vec3 radiance = vec3(0,0,0);
-			for(int i = 0; i < nLights; i++) {
+			for(int i = 0; i < 2; i++) {
 				vec3 L = normalize(wLight[i]);
-				vec3 H = normalize(L + V);
+				vec3 H = normalize(L + V);			
 				float cost = max(dot(N,L), 0), cosd = max(dot(N,H), 0);
-				radiance += ka * lights[i].La + 
-                           ((kd * cost + material.ks * pow(cosd, material.shininess)) * lights[i].Le);
+				if(dot(normalize(lights[i].dir), normalize(wLight[i])) < lights[i].fov){
+					radiance += ka * lights[i].La + 
+							((kd * cost + material.ks * pow(cosd, material.shininess)) * lights[i].Le);
+				}
 			}
 			fragmentColor = vec4(radiance, 1);
 		}
@@ -234,6 +242,8 @@ public:
 		setUniform(light.La, name + ".La");
 		setUniform(light.Le, name + ".Le");
 		setUniform(light.wLightPos, name + ".wLightPos");
+		setUniform(light.dir, name + ".dir");
+		setUniform(light.fov, name + ".fov");
 	}
 };
 
@@ -497,12 +507,15 @@ public:
 		lights[0].wLightPos = vec4(0, 0, 5, 1);
 		lights[0].La = vec3(3, 3, 3);
 		lights[0].Le = vec3(0.4, 0.4, 0.4);
-
+		lights[0].dir = vec3(0, 1, 0);
+		lights[0].fov = 100;
 
 		vec3 fp = bura->refPoint;
 		lights[1].wLightPos = vec4(fp.x, fp.y, fp.z, 1);
 		lights[1].La = vec3(1, 1, 1);
-		lights[1].Le = vec3(0.3, 0.5, 0.5);
+		lights[1].Le = vec3(0, 0.8, 0.5);
+		lights[1].dir = vec3(0, 1, 0);
+		lights[1].fov = 0;
 
 	}
 
@@ -523,13 +536,14 @@ public:
 		vec4 finalPosv4 = vec4(finalPos.x, finalPos.y, finalPos.z, 1);
 		vec3 diff = finalPos - startPos;
 		lights[1].wLightPos = finalPosv4;
+		lights[1].dir = finalPos;
 		rud1->shader->setUniform(lights[1].wLightPos, "lights[1].wLightPos");
 	}
 
 	void Animate(float tstart, float tend) {
 		Object* rud1 = objects.back();
 		rud1->Animate(tstart, tend);
-		camera.Animate(tstart - tend);
+		//camera.Animate(tstart - tend);
 	}
 };
 
