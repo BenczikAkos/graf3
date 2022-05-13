@@ -48,7 +48,6 @@ template<class T> struct Dnum {
 	}
 };
 
-// Elementary functions prepared for the chain rule as well
 template<class T> Dnum<T> Exp(Dnum<T> g) { return Dnum<T>(expf(g.f), expf(g.f) * g.d); }
 template<class T> Dnum<T> Sin(Dnum<T> g) { return  Dnum<T>(sinf(g.f), cosf(g.f) * g.d); }
 template<class T> Dnum<T> Cos(Dnum<T>  g) { return  Dnum<T>(cosf(g.f), -sinf(g.f) * g.d); }
@@ -67,17 +66,17 @@ const int tessellationLevel = 50;
 
 
 //---------------------------
-struct Camera { // 3D camera
+struct Camera {
 //---------------------------
-	vec3 wEye, wLookat, wVup;   // extrinsic
-	float fov, asp, fp, bp;		// intrinsic
+	vec3 wEye, wLookat, wVup;
+	float fov, asp, fp, bp;
 public:
 	Camera() {
 		asp = (float)windowWidth / windowHeight;
 		fov = 75.0f * (float)M_PI / 180.0f;
 		fp = 1; bp = 20;
 	}
-	mat4 V() { // view matrix: translates the center to the origin
+	mat4 V() {
 		vec3 w = normalize(wEye - wLookat);
 		vec3 u = normalize(cross(wVup, w));
 		vec3 v = cross(w, u);
@@ -87,7 +86,7 @@ public:
 			0, 0, 0, 1);
 	}
 
-	mat4 P() { // projection matrix
+	mat4 P() {
 		return mat4(1 / (tan(fov / 2) * asp), 0, 0, 0,
 			0, 1 / tan(fov / 2), 0, 0,
 			0, 0, -(fp + bp) / (bp - fp), -1,
@@ -106,6 +105,7 @@ struct Material {
 	//---------------------------
 	vec3 kd, ks, ka;
 	float shininess;
+	bool alwaysShine = false;
 };
 
 //---------------------------
@@ -113,8 +113,8 @@ struct Light {
 	//---------------------------
 	vec3 La, Le;
 	vec4 wLightPos;
-	vec3 dir; //merre vilagit
-	float fov; //skalaris szorzat minel legyen kisebb, hogy beleessen a megvilagitasaba
+	vec3 dir;
+	float fov;
 };
 
 
@@ -156,8 +156,7 @@ class Shader : public GPUProgram {
 		out vec3 wLight[8];		    
 
 		void main() {
-			gl_Position = vec4(vtxPos, 1) * MVP; // to NDC
-			// vectors for radiance computation
+			gl_Position = vec4(vtxPos, 1) * MVP;
 			vec4 wPos = vec4(vtxPos, 1) * M;
 			for(int i = 0; i < nLights; i++) {
 				wLight[i] = lights[i].wLightPos.xyz * wPos.w - wPos.xyz * lights[i].wLightPos.w;
@@ -181,6 +180,7 @@ class Shader : public GPUProgram {
 		struct Material {
 			vec3 kd, ks, ka;
 			float shininess;
+			bool alwaysShine;
 		};
 
 		uniform Material material;
@@ -205,7 +205,7 @@ class Shader : public GPUProgram {
 				vec3 L = normalize(wLight[i]);
 				vec3 H = normalize(L + V);			
 				float cost = max(dot(N,L), 0), cosd = max(dot(N,H), 0);
-				if(dot(normalize(lights[i].dir), normalize(wLight[i])) < lights[i].fov){
+				if(dot(normalize(lights[i].dir), normalize(wLight[i])) < lights[i].fov || material.alwaysShine) {
 					radiance += ka * lights[i].La + 
 							((kd * cost + material.ks * pow(cosd, material.shininess)) * lights[i].Le);
 				}
@@ -235,6 +235,7 @@ public:
 		setUniform(material.ks, name + ".ks");
 		setUniform(material.ka, name + ".ka");
 		setUniform(material.shininess, name + ".shininess");
+		setUniform(material.alwaysShine, name + ".alwaysShine");
 	}
 
 	void setUniformLight(const Light& light, const std::string& name) {
@@ -376,7 +377,6 @@ public:
 		shader = _shader;
 		material = _material;
 		geometry = _geometry;
-		//refPoint = translate;
 	}
 
 	void setChild(Object* object) {
@@ -394,7 +394,7 @@ public:
 		state.M = ScaleMatrix(scale) *
 			RotationMatrix(rotationAngle, rotationAxis) *
 			TranslateMatrix(translation) * state.M;
-		vec4 refPointv4 = vec4(0, 1, 0, 1) * state.M;
+		vec4 refPointv4 = vec4(0, 0, 0, 1) * state.M;
 		refPoint = vec3(refPointv4.x, refPointv4.y, refPointv4.z);
 		state.Minv = state.Minv *
 			TranslateMatrix(-translation) *
@@ -435,6 +435,13 @@ public:
 		matter->ks = vec3(4, 4, 4);
 		matter->ka = vec3(0.1f, 0.1f, 0.1f);
 		matter->shininess = 300;
+
+		Material* buraMatter = new Material;
+		buraMatter->kd = vec3(0.8f, 0.8f, 0.8f);
+		buraMatter->ks = vec3(4, 4, 4);
+		buraMatter->ka = vec3(0.1f, 0.1f, 0.1f);
+		buraMatter->alwaysShine = true;
+		buraMatter->shininess = 300;
 
 		Material* floormatter = new Material;
 		floormatter->kd = vec3(0.2f, 0.2f, 0.9f);
@@ -482,7 +489,7 @@ public:
 		rud2->setChild(csuklo3);
 
 
-		Object* bura = new Object(shader, matter, paraboloid, vec3(0, 0, 0));
+		Object* bura = new Object(shader, buraMatter, paraboloid, vec3(0, 0, 0));
 		bura->rotationAxis = vec3(5, -3, 0);
 		bura->scale = vec3(1, 0.5f, 1);
 		csuklo3->setChild(bura);
@@ -492,18 +499,18 @@ public:
 		camera.wVup = vec3(0, 1, 0);
 
 		lights.resize(2);
-		lights[0].wLightPos = vec4(0, 0, 5, 1);
-		lights[0].La = vec3(0.3, 0.3, 0.3);
-		lights[0].Le = vec3(0.4, 0.4, 0.4);
+		lights[0].wLightPos = vec4(0, -0.5, 3, 1);
+		lights[0].La = vec3(1, 1, 1);
+		lights[0].Le = vec3(0.75, 0.75, 0.75);
 		lights[0].dir = vec3(0, 1, 0);
 		lights[0].fov = 1;
 
 		vec3 fp = bura->refPoint;
 		lights[1].wLightPos = vec4(fp.x, fp.y, fp.z, 1);
 		lights[1].La = vec3(1, 1, 1);
-		lights[1].Le = vec3(0, 0.8, 0.5);
+		lights[1].Le = vec3(0.8, 0.6, 0.1);
 		lights[1].dir = vec3(0, 1, 0);
-		lights[1].fov = 0;
+		lights[1].fov = -0.38;
 
 	}
 
@@ -522,14 +529,14 @@ public:
 		const vec3 finalPos = rud1->getLastRefPoint();
 		vec4 finalPosv4 = vec4(finalPos.x, finalPos.y, finalPos.z, 1);
 		lights[1].wLightPos = finalPosv4;
-		lights[1].dir = finalPos;
+		lights[1].dir = normalize(finalPos);
 		rud1->shader->setUniform(lights[1].wLightPos, "lights[1].wLightPos");
 	}
 
 	void Animate(float tstart, float tend) {
 		Object* rud1 = objects.back();
 		rud1->Animate(tstart, tend);
-		//camera.Animate(tstart - tend);
+		camera.Animate(tstart - tend);
 	}
 };
 
