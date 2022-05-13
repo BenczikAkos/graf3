@@ -33,10 +33,10 @@
 #include "framework.h"
 
 //---------------------------
-template<class T> struct Dnum { // Dual numbers for automatic derivation
+template<class T> struct Dnum { 
 //---------------------------
-	float f; // function value
-	T d;  // derivatives
+	float f; 
+	T d;  
 	Dnum(float f0 = 0, T d0 = T(0)) { f = f0, d = d0; }
 	Dnum operator+(Dnum r) { return Dnum(f + r.f, d + r.d); }
 	Dnum operator-(Dnum r) { return Dnum(f - r.f, d - r.d); }
@@ -112,7 +112,7 @@ struct Material {
 struct Light {
 	//---------------------------
 	vec3 La, Le;
-	vec4 wLightPos; // homogeneous coordinates, can be at ideal point
+	vec4 wLightPos;
 	vec3 dir; //merre vilagit
 	float fov; //skalaris szorzat minel legyen kisebb, hogy beleessen a megvilagitasaba
 };
@@ -143,17 +143,17 @@ class Shader : public GPUProgram {
 			float fov;
 		};
 
-		uniform mat4  MVP, M, Minv; // MVP, Model, Model-inverse
-		uniform Light[8] lights;    // light sources 
+		uniform mat4  MVP, M, Minv; 
+		uniform Light[8] lights;    
 		uniform int   nLights;
-		uniform vec3  wEye;         // pos of eye
+		uniform vec3  wEye;         
 
-		layout(location = 0) in vec3  vtxPos;            // pos in modeling space
-		layout(location = 1) in vec3  vtxNorm;      	 // normal in modeling space
+		layout(location = 0) in vec3  vtxPos;            
+		layout(location = 1) in vec3  vtxNorm;      	 
 
-		out vec3 wNormal;		    // normal in world space
-		out vec3 wView;             // view in world space
-		out vec3 wLight[8];		    // light dir in world space
+		out vec3 wNormal;		    
+		out vec3 wView;             
+		out vec3 wLight[8];		    
 
 		void main() {
 			gl_Position = vec4(vtxPos, 1) * MVP; // to NDC
@@ -167,7 +167,6 @@ class Shader : public GPUProgram {
 		}
 	)";
 
-	// fragment shader in GLSL
 	const char* fragmentSource = R"(
 		#version 330
 		precision highp float;
@@ -185,19 +184,19 @@ class Shader : public GPUProgram {
 		};
 
 		uniform Material material;
-		uniform Light[8] lights;    // light sources 
+		uniform Light[8] lights;     
 		uniform int   nLights;
 
-		in  vec3 wNormal;       // interpolated world sp normal
-		in  vec3 wView;         // interpolated world sp view
-		in  vec3 wLight[8];     // interpolated world sp illum dir
+		in  vec3 wNormal;       
+		in  vec3 wView;         
+		in  vec3 wLight[8];     
 		
-        out vec4 fragmentColor; // output goes to frame buffer
+        out vec4 fragmentColor; 
 
 		void main() {
 			vec3 N = normalize(wNormal);
 			vec3 V = normalize(wView); 
-			if (dot(N, V) < 0) N = -N;	// prepare for one-sided surfaces like Mobius or Klein
+			if (dot(N, V) < 0) N = -N;	
 			vec3 ka = material.ka;
 			vec3 kd = material.kd;
 			
@@ -218,7 +217,7 @@ public:
 	Shader() { create(vertexSource, fragmentSource, "fragmentColor"); }
 
 	void Bind(RenderState state) {
-		Use(); 		// make this program run
+		Use();
 		setUniform(state.MVP, "MVP");
 		setUniform(state.M, "M");
 		setUniform(state.Minv, "Minv");
@@ -252,12 +251,12 @@ public:
 class Geometry {
 	//---------------------------
 protected:
-	unsigned int vao, vbo;        // vertex array object
+	unsigned int vao, vbo;
 public:
 	Geometry() {
 		glGenVertexArrays(1, &vao);
 		glBindVertexArray(vao);
-		glGenBuffers(1, &vbo); // Generate 1 vertex buffer object
+		glGenBuffers(1, &vbo);
 		glBindBuffer(GL_ARRAY_BUFFER, vbo);
 	}
 	virtual void Draw() = 0;
@@ -296,7 +295,7 @@ public:
 	void create(int N = tessellationLevel, int M = tessellationLevel) {
 		nVtxPerStrip = (M + 1) * 2;
 		nStrips = N;
-		std::vector<VertexData> vtxData;	// vertices on the CPU
+		std::vector<VertexData> vtxData;
 		for (int i = 0; i < N; i++) {
 			for (int j = 0; j <= M; j++) {
 				vtxData.push_back(GenVertexData((float)j / M, (float)i / N));
@@ -304,14 +303,10 @@ public:
 			}
 		}
 		glBufferData(GL_ARRAY_BUFFER, nVtxPerStrip * nStrips * sizeof(VertexData), &vtxData[0], GL_STATIC_DRAW);
-		// Enable the vertex attribute arrays
-		glEnableVertexAttribArray(0);  // attribute array 0 = POSITION
-		glEnableVertexAttribArray(1);  // attribute array 1 = NORMAL
-		glEnableVertexAttribArray(2);  // attribute array 2 = TEXCOORD0
-		// attribute array, components/attribute, component type, normalize?, stride, offset
+		glEnableVertexAttribArray(0); 
+		glEnableVertexAttribArray(1);
 		glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(VertexData), (void*)offsetof(VertexData, position));
 		glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, sizeof(VertexData), (void*)offsetof(VertexData, normal));
-		glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, sizeof(VertexData), (void*)offsetof(VertexData, texcoord));
 	}
 
 	void Draw() {
@@ -330,7 +325,6 @@ public:
 		X = Cos(U) * Sin(V); Y = Sin(U) * Sin(V); Z = Cos(V);
 	}
 };
-
 
 //---------------------------
 class Cylinder : public ParamSurface {
@@ -382,7 +376,7 @@ public:
 		shader = _shader;
 		material = _material;
 		geometry = _geometry;
-		refPoint = translate;
+		//refPoint = translate;
 	}
 
 	void setChild(Object* object) {
@@ -400,7 +394,7 @@ public:
 		state.M = ScaleMatrix(scale) *
 			RotationMatrix(rotationAngle, rotationAxis) *
 			TranslateMatrix(translation) * state.M;
-		vec4 refPointv4 = vec4(0, 0, 0, 1) * state.M;
+		vec4 refPointv4 = vec4(0, 1, 0, 1) * state.M;
 		refPoint = vec3(refPointv4.x, refPointv4.y, refPointv4.z);
 		state.Minv = state.Minv *
 			TranslateMatrix(-translation) *
@@ -430,14 +424,12 @@ public:
 class Scene {
 	//---------------------------
 	std::vector<Object*> objects;
-	Camera camera; // 3D camera
+	Camera camera;
 	std::vector<Light> lights;
 public:
 	void Build() {
-		// Shader
 		Shader* shader = new Shader();
 
-		// Material
 		Material* matter = new Material;
 		matter->kd = vec3(0.8f, 0.8f, 0.8f);
 		matter->ks = vec3(4, 4, 4);
@@ -450,13 +442,11 @@ public:
 		floormatter->ka = vec3(0.1f, 0.1f, 0.1f);
 		floormatter->shininess = 500;
 
-		// Geometries
 		Geometry* sphere = new Sphere();
 		Geometry* cylinder = new Cylinder();
 		Geometry* paraboloid = new Paraboloid();
 		Geometry* circle = new Circle();
 
-		//Objects:
 		Object* floor = new Object(shader, floormatter, circle, vec3(0, -3, 0));
 		floor->scale = vec3(50,50,50);
 		objects.push_back(floor);
@@ -497,18 +487,16 @@ public:
 		bura->scale = vec3(1, 0.5f, 1);
 		csuklo3->setChild(bura);
 
-		// Camera
 		camera.wEye = vec3(0, 2, 12);
 		camera.wLookat = vec3(0, 0, 0);
 		camera.wVup = vec3(0, 1, 0);
 
-		// Lights
 		lights.resize(2);
 		lights[0].wLightPos = vec4(0, 0, 5, 1);
-		lights[0].La = vec3(3, 3, 3);
+		lights[0].La = vec3(0.3, 0.3, 0.3);
 		lights[0].Le = vec3(0.4, 0.4, 0.4);
 		lights[0].dir = vec3(0, 1, 0);
-		lights[0].fov = 100;
+		lights[0].fov = 1;
 
 		vec3 fp = bura->refPoint;
 		lights[1].wLightPos = vec4(fp.x, fp.y, fp.z, 1);
@@ -528,13 +516,11 @@ public:
 		state.lights = lights;
 
 		Object* rud1 = objects.back();
-		const vec3 startPos = rud1->getLastRefPoint();
 
 		for (Object* obj : objects) obj->Draw(state);
 
 		const vec3 finalPos = rud1->getLastRefPoint();
 		vec4 finalPosv4 = vec4(finalPos.x, finalPos.y, finalPos.z, 1);
-		vec3 diff = finalPos - startPos;
 		lights[1].wLightPos = finalPosv4;
 		lights[1].dir = finalPos;
 		rud1->shader->setUniform(lights[1].wLightPos, "lights[1].wLightPos");
@@ -549,7 +535,6 @@ public:
 
 Scene scene;
 
-// Initialization, create an OpenGL context
 void onInitialization() {
 	glViewport(0, 0, windowWidth, windowHeight);
 	glEnable(GL_DEPTH_TEST);
@@ -557,31 +542,25 @@ void onInitialization() {
 	scene.Build();
 }
 
-// Window has become invalid: Redraw
 void onDisplay() {
-	glClearColor(0.5f, 0.5f, 0.8f, 1.0f);							// background color 
-	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT); // clear the screen
+	glClearColor(0.5f, 0.5f, 0.8f, 1.0f);
+	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT); 
 	scene.Render();
-	glutSwapBuffers();									// exchange the two buffers
+	glutSwapBuffers();									
 }
 
-// Key of ASCII code pressed
 void onKeyboard(unsigned char key, int pX, int pY) { }
 
-// Key of ASCII code released
 void onKeyboardUp(unsigned char key, int pX, int pY) { }
 
-// Mouse click event
 void onMouse(int button, int state, int pX, int pY) { }
 
-// Move mouse with key pressed
 void onMouseMotion(int pX, int pY) {
 }
 
-// Idle event indicating that some time elapsed: do animation here
 void onIdle() {
 	static float tend = 0;
-	const float dt = 0.1f; // dt is ”infinitesimal”
+	const float dt = 0.1f;
 	float tstart = tend;
 	tend = glutGet(GLUT_ELAPSED_TIME) / 1000.0f;
 
